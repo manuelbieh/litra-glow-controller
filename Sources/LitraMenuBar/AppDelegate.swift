@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var isOn = false
     private var brightness = 100
     private var temperature = 4500
+    private var target: LitraTarget = .all
 
     private var toggleItem: NSMenuItem!
     private var brightnessLabel: NSMenuItem!
@@ -15,9 +16,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var temperatureLabel: NSMenuItem!
     private var temperatureSlider: NSSlider!
     private var launchAtLoginItem: NSMenuItem!
+    private var lightItem: NSMenuItem!
+    private var lightSubmenu: NSMenu!
+    private var lightSeparator: NSMenuItem!
+
+    private let targetDefaultsKey = "selectedLightSerial"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+
+        target = loadSavedTarget()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         updateStatusIcon()
@@ -62,8 +70,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         menu.addItem(wrap(temperatureSlider))
 
-        menu.addItem(.separator())
+        lightSeparator = .separator()
+        menu.addItem(lightSeparator)
+        lightSubmenu = NSMenu()
+        lightItem = NSMenuItem(title: "Light", action: nil, keyEquivalent: "")
+        lightItem.submenu = lightSubmenu
+        menu.addItem(lightItem)
 
+        menu.addItem(.separator())
         launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         launchAtLoginItem.target = self
         menu.addItem(launchAtLoginItem)
@@ -72,7 +86,70 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
+
+        litra.onDevicesChanged = { [weak self] in self?.rebuildLightSubmenu() }
+        rebuildLightSubmenu()
     }
+
+    // MARK: - Light selection
+
+    private func loadSavedTarget() -> LitraTarget {
+        if let serial = UserDefaults.standard.string(forKey: targetDefaultsKey), !serial.isEmpty {
+            return .serial(serial)
+        }
+        return .all
+    }
+
+    private func saveTarget() {
+        switch target {
+        case .all:
+            UserDefaults.standard.removeObject(forKey: targetDefaultsKey)
+        case .serial(let s):
+            UserDefaults.standard.set(s, forKey: targetDefaultsKey)
+        }
+    }
+
+    private func rebuildLightSubmenu() {
+        let devices = litra.devices
+        lightSubmenu.removeAllItems()
+
+        let allItem = NSMenuItem(title: "All Lights", action: #selector(selectAllLights), keyEquivalent: "")
+        allItem.target = self
+        allItem.state = (target == .all) ? .on : .off
+        lightSubmenu.addItem(allItem)
+
+        if !devices.isEmpty {
+            lightSubmenu.addItem(.separator())
+            for device in devices {
+                let item = NSMenuItem(title: device.displayName, action: #selector(selectLight(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = device.serial
+                item.state = (target == .serial(device.serial)) ? .on : .off
+                lightSubmenu.addItem(item)
+            }
+        }
+
+        // Hide the whole "Light" submenu when there's at most one device —
+        // no meaningful choice to make.
+        let shouldShow = devices.count > 1
+        lightItem.isHidden = !shouldShow
+        lightSeparator.isHidden = !shouldShow
+    }
+
+    @objc private func selectAllLights() {
+        target = .all
+        saveTarget()
+        rebuildLightSubmenu()
+    }
+
+    @objc private func selectLight(_ sender: NSMenuItem) {
+        guard let serial = sender.representedObject as? String else { return }
+        target = .serial(serial)
+        saveTarget()
+        rebuildLightSubmenu()
+    }
+
+    // MARK: - Launch at Login
 
     private func refreshLaunchAtLoginState() {
         launchAtLoginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
@@ -91,6 +168,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    // MARK: - Click handling
+
     @objc private func handleClick() {
         let event = NSApp.currentEvent
         if event?.type == .rightMouseUp {
@@ -101,6 +180,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             statusItem.menu = nil
         }
     }
+
+    // MARK: - UI helpers
 
     private func makeSlider(min: Double, max: Double, value: Double, action: Selector) -> NSSlider {
         let slider = NSSlider(value: value, minValue: min, maxValue: max, target: self, action: action)
@@ -135,9 +216,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         toggleItem.title = isOn ? "Turn Off" : "Turn On"
     }
 
+    // MARK: - Actions
+
     @objc private func toggle() {
         do {
-            if isOn { try litra.turnOff() } else { try litra.turnOn() }
+            if isOn { try litra.turnOff(target) } else { try litra.turnOn(target) }
             isOn.toggle()
             updateStatusIcon()
             refreshToggleTitle()
@@ -149,13 +232,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func brightnessChanged(_ sender: NSSlider) {
         brightness = Int(sender.doubleValue.rounded())
         brightnessLabel.title = "Brightness: \(brightness)"
-        do { try litra.setBrightness(brightness) } catch { presentError(error) }
+        do { try litra.setBrightness(brightness, target) } catch { presentError(error) }
     }
 
     @objc private func temperatureChanged(_ sender: NSSlider) {
         temperature = Int((sender.doubleValue / 100.0).rounded()) * 100
         temperatureLabel.title = "Temperature: \(temperature) K"
-        do { try litra.setTemperature(temperature) } catch { presentError(error) }
+        do { try litra.setTemperature(temperature, target) } catch { presentError(error) }
     }
 
     private func presentError(_ error: Error) {
