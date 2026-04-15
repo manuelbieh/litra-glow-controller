@@ -2,6 +2,10 @@
 
 A tiny macOS menu bar app to control the [Logitech Litra Glow](https://www.logitech.com/en-us/products/lighting/litra-glow.html) USB light: on/off, brightness, and color temperature. No Logitech G HUB required.
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="Screenshot of the Litra Glow Controller menu" width="360">
+</p>
+
 ## Why
 
 The Logitech Litra Glow is a nice little webcam light, but the only official way to control it is through Logitech G HUB — a 500+ MB app that runs a background service, launches at login, nags for updates, and does far more than anyone needs just to toggle a USB lamp. I wanted a button in my menu bar. This is that button.
