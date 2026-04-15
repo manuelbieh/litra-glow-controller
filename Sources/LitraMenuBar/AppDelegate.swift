@@ -47,7 +47,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
 
         brightnessLabel = NSMenuItem(title: "Brightness: \(brightness)", action: nil, keyEquivalent: "")
-        brightnessLabel.isEnabled = false
         menu.addItem(brightnessLabel)
         brightnessSlider = makeSlider(
             min: Double(Litra.brightnessMin),
@@ -60,7 +59,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
 
         temperatureLabel = NSMenuItem(title: "Temperature: \(temperature) K", action: nil, keyEquivalent: "")
-        temperatureLabel.isEnabled = false
         menu.addItem(temperatureLabel)
         temperatureSlider = makeSlider(
             min: Double(Litra.temperatureMin),
@@ -186,6 +184,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func makeSlider(min: Double, max: Double, value: Double, action: Selector) -> NSSlider {
         let slider = NSSlider(value: value, minValue: min, maxValue: max, target: self, action: action)
         slider.isContinuous = true
+        slider.controlSize = .small
+        slider.trackFillColor = NSColor.controlAccentColor
         slider.frame = NSRect(x: 20, y: 0, width: 200, height: 22)
         return slider
     }
