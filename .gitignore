@@ -1,0 +1,11 @@
+.build/
+build/
+dist/
+.swiftpm/
+Package.resolved
+LitraMenuBar.app/
+.DS_Store
+*.xcodeproj
+*.xcworkspace
+.vscode/
+.idea/
