@@ -34,9 +34,12 @@ Requires macOS 13+ and Xcode command-line tools.
 ```sh
 git clone git@github.com:manuelbieh/litra-glow-controller.git
 cd litra-glow-controller
-./scripts/build.sh 0.1.0
-open dist/LitraGlowController-0.1.0.dmg
+./scripts/build.sh 0.1.0 --install
 ```
+
+`--install` copies the app to `/Applications` and starts it. Without it, open
+`dist/LitraGlowController-0.1.0.dmg` and drag the app into Applications. Keep the app in
+`/Applications`: on macOS 27, Bartender can't show or move the menu bar item of an app anywhere else.
 
 ## Usage
 

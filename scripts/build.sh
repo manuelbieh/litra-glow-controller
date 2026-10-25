@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 # Build, bundle, ad-hoc sign, and package the Litra Glow Controller as a DMG.
-# Usage: scripts/build.sh [version]   (default: 0.1.0)
+# Usage: scripts/build.sh [version] [--install]   (default version: 0.1.0)
+# --install also copies the app to /Applications (or ~/Applications when /Applications isn't
+# writable) and starts it.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-VERSION="${1:-0.1.0}"
+VERSION="0.1.0"
+INSTALL=false
+for arg in "$@"; do
+  case "${arg}" in
+    --install) INSTALL=true ;;
+    *) VERSION="${arg}" ;;
+  esac
+done
 BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 APP_NAME="LitraMenuBar"
 BUNDLE_NAME="Litra Glow Controller"
@@ -37,3 +46,17 @@ ln -s /Applications "${STAGE}/Applications"
 hdiutil create -volname "${BUNDLE_NAME}" -srcfolder "${STAGE}" -ov -format UDZO "${DMG}" >/dev/null
 
 echo "✓ ${DMG}"
+
+if [[ "${INSTALL}" == true ]]; then
+  # macOS 27 identifies the menu bar item of an app outside /Applications by its binary path,
+  # and menu bar managers such as Bartender can't show or move such an item.
+  DEST="/Applications"
+  [[ -w "${DEST}" ]] || DEST="${HOME}/Applications"
+  echo "→ Installing to ${DEST}"
+  pkill -x "${APP_NAME}" || true
+  mkdir -p "${DEST}"
+  rm -rf "${DEST}/${BUNDLE_NAME}.app"
+  cp -R "${BUNDLE}" "${DEST}/${BUNDLE_NAME}.app"
+  open "${DEST}/${BUNDLE_NAME}.app"
+  echo "✓ ${DEST}/${BUNDLE_NAME}.app"
+fi
